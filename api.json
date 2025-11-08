@@ -1,0 +1,516 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Gestor Local API",
+    "version": "1.0.0",
+    "description": "Backend básico para Inventario, Préstamos, Solicitudes y Usuarios con JWT.\nImporta este JSON en Insomnia (Create -> Import -> From File/Clipboard) para generar todas las requests."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000/api",
+      "description": "Servidor local"
+    }
+  ],
+  "tags": [
+    { "name": "System", "description": "Salud del servicio" },
+    { "name": "Auth", "description": "Autenticación con JWT" },
+    { "name": "Usuarios", "description": "Administración de usuarios (solo admin)" },
+    { "name": "Items", "description": "Inventario" },
+    { "name": "Préstamos", "description": "Préstamos y devoluciones" },
+    { "name": "Solicitudes", "description": "Solicitudes de préstamo/devolución/baja" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Incluye `Authorization: Bearer <token>`"
+      }
+    },
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": { "type": "string", "example": "Mensaje de error" }
+        }
+      },
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean", "example": true },
+          "service": { "type": "string", "example": "gestor-local-api" },
+          "ts": { "type": "string", "format": "date-time" }
+        }
+      },
+      "UserPublic": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "description": "ObjectId" },
+          "nombre": { "type": "string" },
+          "usuario": { "type": "string" },
+          "email": { "type": "string", "format": "email" },
+          "rol": { "type": "string", "enum": ["admin", "encargado", "invitado"] },
+          "activo": { "type": "boolean" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "UserCreate": {
+        "type": "object",
+        "required": ["nombre", "usuario", "email", "password"],
+        "properties": {
+          "nombre": { "type": "string", "example": "Ana Pérez" },
+          "usuario": { "type": "string", "example": "aperez" },
+          "email": { "type": "string", "format": "email", "example": "ana@example.com" },
+          "password": { "type": "string", "example": "secreto123" },
+          "rol": { "type": "string", "enum": ["admin", "encargado", "invitado"], "example": "encargado" },
+          "activo": { "type": "boolean", "example": true }
+        }
+      },
+      "UserUpdate": {
+        "type": "object",
+        "properties": {
+          "nombre": { "type": "string" },
+          "email": { "type": "string", "format": "email" },
+          "rol": { "type": "string", "enum": ["admin", "encargado", "invitado"] },
+          "activo": { "type": "boolean" },
+          "password": { "type": "string", "description": "Si se envía, se actualiza" }
+        }
+      },
+      "AuthLoginRequest": {
+        "type": "object",
+        "required": ["usuario", "password"],
+        "properties": {
+          "usuario": { "type": "string", "example": "admin" },
+          "password": { "type": "string", "example": "admin123" }
+        }
+      },
+      "AuthLoginResponse": {
+        "type": "object",
+        "properties": {
+          "token": { "type": "string", "description": "JWT" },
+          "user": { "$ref": "#/components/schemas/UserPublic" }
+        }
+      },
+      "Item": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "description": "ObjectId" },
+          "descripcion": { "type": "string", "example": "Multímetro" },
+          "categoria": { "type": "string", "example": "Laboratorio" },
+          "cantidad": { "type": "integer", "example": 10 },
+          "minimo": { "type": "integer", "example": 2 },
+          "critico": { "type": "integer", "example": 1 },
+          "responsable": { "type": "string", "example": "Bodega" },
+          "observacion": { "type": "string", "example": "Equipo calibrado 2025-01" },
+          "estado": { "type": "string", "enum": ["OK", "BAJO", "CRITICO"], "description": "Virtual derivado de cantidad/minimo/critico" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "ItemCreate": {
+        "type": "object",
+        "required": ["descripcion"],
+        "properties": {
+          "descripcion": { "type": "string" },
+          "categoria": { "type": "string" },
+          "cantidad": { "type": "integer", "default": 0 },
+          "minimo": { "type": "integer", "default": 0 },
+          "critico": { "type": "integer", "default": 0 },
+          "responsable": { "type": "string" },
+          "observacion": { "type": "string" }
+        }
+      },
+      "ItemUpdate": {
+        "type": "object",
+        "properties": {
+          "descripcion": { "type": "string" },
+          "categoria": { "type": "string" },
+          "cantidad": { "type": "integer" },
+          "minimo": { "type": "integer" },
+          "critico": { "type": "integer" },
+          "responsable": { "type": "string" },
+          "observacion": { "type": "string" }
+        }
+      },
+      "Loan": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "item": {
+            "description": "Puede venir como ObjectId o documento poblado",
+            "oneOf": [
+              { "type": "string", "description": "ObjectId de Item" },
+              { "$ref": "#/components/schemas/Item" }
+            ]
+          },
+          "persona": { "type": "string", "example": "Juan López" },
+          "prestado": { "type": "integer", "example": 2 },
+          "devuelto": { "type": "integer", "example": 1 },
+          "fechaEntrega": { "type": "string", "format": "date-time" },
+          "fechaVence": { "type": "string", "format": "date-time", "example": "2025-12-31T23:59:59.000Z" },
+          "observacion": { "type": "string", "example": "Uso en sala 2" },
+          "estado": { "type": "string", "enum": ["EN_CURSO", "VENCIDO", "COMPLETO"] },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "LoanCreate": {
+        "type": "object",
+        "required": ["item", "persona", "prestado", "fechaVence"],
+        "properties": {
+          "item": { "type": "string", "description": "ObjectId de Item" },
+          "persona": { "type": "string" },
+          "prestado": { "type": "integer" },
+          "fechaVence": { "type": "string", "format": "date-time" },
+          "observacion": { "type": "string" }
+        }
+      },
+      "LoanReturnRequest": {
+        "type": "object",
+        "properties": {
+          "cantidad": { "type": "integer", "example": 1, "description": "Si se omite, se asume 0" },
+          "observacion": { "type": "string", "example": "Devuelto con funda" }
+        }
+      },
+      "Request": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "tipo": { "type": "string", "enum": ["prestamo", "devolucion", "baja"] },
+          "persona": { "type": "string" },
+          "item": {
+            "oneOf": [
+              { "type": "string", "description": "ObjectId de Item" },
+              { "$ref": "#/components/schemas/Item" }
+            ]
+          },
+          "cantidad": { "type": "integer" },
+          "estado": { "type": "string", "enum": ["pendiente", "aprobada", "rechazada", "completa"] },
+          "observacion": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "RequestCreate": {
+        "type": "object",
+        "required": ["tipo", "persona", "item", "cantidad"],
+        "properties": {
+          "tipo": { "type": "string", "enum": ["prestamo", "devolucion", "baja"] },
+          "persona": { "type": "string" },
+          "item": { "type": "string", "description": "ObjectId de Item" },
+          "cantidad": { "type": "integer" },
+          "observacion": { "type": "string" }
+        }
+      },
+      "RequestStatusUpdate": {
+        "type": "object",
+        "required": ["estado"],
+        "properties": {
+          "estado": { "type": "string", "enum": ["pendiente", "aprobada", "rechazada", "completa"] }
+        }
+      }
+    },
+    "parameters": {
+      "IdParam": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string" },
+        "description": "ObjectId del recurso"
+      },
+      "CategoriaQuery": {
+        "name": "categoria",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" },
+        "description": "Filtra items por categoría exacta"
+      },
+      "TipoQuery": {
+        "name": "tipo",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "enum": ["prestamo", "devolucion", "baja"] },
+        "description": "Filtra solicitudes por tipo"
+      },
+      "EstadoSolicitudQuery": {
+        "name": "estado",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "enum": ["pendiente", "aprobada", "rechazada", "completa"] },
+        "description": "Filtra solicitudes por estado"
+      }
+    }
+  },
+  "security": [],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Healthcheck",
+        "operationId": "health",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HealthResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Login (obtener JWT)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AuthLoginRequest" },
+              "examples": {
+                "admin": {
+                  "summary": "Admin por defecto (seed)",
+                  "value": { "usuario": "admin", "password": "admin123" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Token JWT y datos públicos del usuario",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AuthLoginResponse" }
+              }
+            }
+          },
+          "401": {
+            "description": "Credenciales inválidas",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          }
+        }
+      }
+    },
+    "/users": {
+      "get": {
+        "tags": ["Usuarios"],
+        "summary": "Listar usuarios (solo admin)",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Listado de usuarios",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/UserPublic" } }
+              }
+            }
+          },
+          "401": { "description": "No autenticado" },
+          "403": { "description": "Sin permisos" }
+        }
+      },
+      "post": {
+        "tags": ["Usuarios"],
+        "summary": "Crear usuario (solo admin)",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UserCreate" } } }
+        },
+        "responses": {
+          "201": { "description": "Usuario creado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UserPublic" } } } },
+          "409": { "description": "usuario o email ya existe", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/users/{id}": {
+      "put": {
+        "tags": ["Usuarios"],
+        "summary": "Actualizar usuario (solo admin)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/IdParam" }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UserUpdate" } } }
+        },
+        "responses": {
+          "200": { "description": "Usuario actualizado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UserPublic" } } } },
+          "404": { "description": "Usuario no existe", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      },
+      "delete": {
+        "tags": ["Usuarios"],
+        "summary": "Eliminar usuario (solo admin)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/IdParam" }],
+        "responses": {
+          "200": { "description": "Eliminado", "content": { "application/json": { "schema": { "type": "object", "properties": { "ok": { "type": "boolean", "example": true } } } } } }
+        }
+      }
+    },
+    "/items": {
+      "get": {
+        "tags": ["Items"],
+        "summary": "Listar items",
+        "parameters": [{ "$ref": "#/components/parameters/CategoriaQuery" }],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Item" } } } } }
+        }
+      },
+      "post": {
+        "tags": ["Items"],
+        "summary": "Crear item (admin/encargado)",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ItemCreate" } } }
+        },
+        "responses": {
+          "201": { "description": "Creado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Item" } } } }
+        }
+      }
+    },
+    "/items/{id}": {
+      "get": {
+        "tags": ["Items"],
+        "summary": "Obtener item por id",
+        "parameters": [{ "$ref": "#/components/parameters/IdParam" }],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Item" } } } },
+          "404": { "description": "No encontrado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      },
+      "put": {
+        "tags": ["Items"],
+        "summary": "Actualizar item (admin/encargado)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/IdParam" }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ItemUpdate" } } }
+        },
+        "responses": {
+          "200": { "description": "Actualizado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Item" } } } }
+        }
+      },
+      "delete": {
+        "tags": ["Items"],
+        "summary": "Eliminar item (solo admin)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/IdParam" }],
+        "responses": {
+          "200": { "description": "Eliminado", "content": { "application/json": { "schema": { "type": "object", "properties": { "ok": { "type": "boolean", "example": true } } } } } }
+        }
+      }
+    },
+    "/loans": {
+      "get": {
+        "tags": ["Préstamos"],
+        "summary": "Listar préstamos (con item poblado)",
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Loan" } } } } }
+        }
+      },
+      "post": {
+        "tags": ["Préstamos"],
+        "summary": "Crear préstamo (admin/encargado) — descuenta stock",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoanCreate" } } }
+        },
+        "responses": {
+          "201": { "description": "Creado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Loan" } } } },
+          "400": { "description": "Stock insuficiente / datos inválidos", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/loans/{id}/return": {
+      "patch": {
+        "tags": ["Préstamos"],
+        "summary": "Registrar devolución (admin/encargado) — suma stock",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/IdParam" }],
+        "requestBody": {
+          "required": false,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoanReturnRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Loan" } } } },
+          "404": { "description": "Préstamo no encontrado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/loans/{id}": {
+      "delete": {
+        "tags": ["Préstamos"],
+        "summary": "Eliminar préstamo (solo admin) — revierte stock pendiente",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/IdParam" }],
+        "responses": {
+          "200": { "description": "Eliminado", "content": { "application/json": { "schema": { "type": "object", "properties": { "ok": { "type": "boolean", "example": true } } } } } },
+          "404": { "description": "Préstamo no encontrado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/requests": {
+      "get": {
+        "tags": ["Solicitudes"],
+        "summary": "Listar solicitudes",
+        "parameters": [
+          { "$ref": "#/components/parameters/TipoQuery" },
+          { "$ref": "#/components/parameters/EstadoSolicitudQuery" }
+        ],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Request" } } } } }
+        }
+      },
+      "post": {
+        "tags": ["Solicitudes"],
+        "summary": "Crear solicitud (admin/encargado)",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RequestCreate" } } }
+        },
+        "responses": {
+          "201": { "description": "Creada", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Request" } } } }
+        }
+      }
+    },
+    "/requests/{id}/status": {
+      "patch": {
+        "tags": ["Solicitudes"],
+        "summary": "Actualizar estado (admin/encargado)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/IdParam" }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RequestStatusUpdate" } } }
+        },
+        "responses": {
+          "200": { "description": "Actualizada", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Request" } } } },
+          "404": { "description": "Solicitud no encontrada", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/requests/{id}": {
+      "delete": {
+        "tags": ["Solicitudes"],
+        "summary": "Eliminar solicitud (solo admin)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/IdParam" }],
+        "responses": {
+          "200": { "description": "Eliminada", "content": { "application/json": { "schema": { "type": "object", "properties": { "ok": { "type": "boolean", "example": true } } } } } }
+        }
+      }
+    }
+  }
+}
