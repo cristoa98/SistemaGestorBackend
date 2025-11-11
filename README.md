@@ -291,16 +291,6 @@ curl -X PATCH http://localhost:3000/api/loans/<LOAN_ID>/return \
 
 ---
 
-## Roadmap
-
-* Validaciones extendidas (Zod/express-validator)
-* Paginación, búsqueda y ordenamiento en listados
-* Automatización de Requests (ejecutar acción al aprobar)
-* Auditoría de cambios (AuditLog)
-* Reportes (stock crítico, préstamos vencidos, consumo por categoría)
-* Docker y tests (Jest + supertest)
-
-
 ## Cómo consumir desde el frontend (ejemplos)
 ```js
 // login
