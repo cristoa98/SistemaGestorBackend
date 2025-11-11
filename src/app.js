@@ -14,7 +14,6 @@ app.use(morgan("dev"));
 app.use(express.json());
 app.use(cors({ origin: config.frontendOrigin, credentials: false }));
 
-app.get("/api/health", (req, res) => res.json({ ok: true, service: "gestor-local-api", ts: new Date().toISOString() }));
 
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);

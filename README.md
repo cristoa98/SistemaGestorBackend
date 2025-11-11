@@ -153,10 +153,6 @@ src/
 
 ## Endpoints
 
-### Sistema
-
-* `GET /api/health` → `{ ok, service, ts }`
-
 ### Auth
 
 * `POST /api/auth/login`
@@ -221,12 +217,6 @@ src/
 ---
 
 ## Ejemplos de uso (cURL)
-
-### Health
-
-```bash
-curl http://localhost:3000/api/health
-```
 
 ### Login
 

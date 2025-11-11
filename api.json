@@ -35,14 +35,6 @@
           "error": { "type": "string", "example": "Mensaje de error" }
         }
       },
-      "HealthResponse": {
-        "type": "object",
-        "properties": {
-          "ok": { "type": "boolean", "example": true },
-          "service": { "type": "string", "example": "gestor-local-api" },
-          "ts": { "type": "string", "format": "date-time" }
-        }
-      },
       "UserPublic": {
         "type": "object",
         "properties": {
@@ -245,23 +237,7 @@
   },
   "security": [],
   "paths": {
-    "/health": {
-      "get": {
-        "tags": ["System"],
-        "summary": "Healthcheck",
-        "operationId": "health",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/HealthResponse" }
-              }
-            }
-          }
-        }
-      }
-    },
+    
     "/auth/login": {
       "post": {
         "tags": ["Auth"],
